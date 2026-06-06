@@ -1,10 +1,11 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app.routers import auth, customers, products, orders, analytics, users
 import app.models  # noqa: F401 — register all models with Base
 
-# Create all tables on startup (use Alembic in production)
+# Create all tables on startup (use Alembic for production migrations)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -13,9 +14,16 @@ app = FastAPI(
     description="Full-stack Retail ERP-CRM with RBAC",
 )
 
+# CORS — reads from env so the same image works in dev and prod
+_raw_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost"
+)
+allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://frontend:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

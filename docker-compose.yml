@@ -1,4 +1,8 @@
 version: '3.8'
+
+# ── Development compose ───────────────────────────────────────────────────────
+# Usage: docker-compose up --build
+
 services:
   db:
     image: postgres:15
@@ -21,22 +25,25 @@ services:
     ports:
       - "8000:8000"
     env_file: ./backend/.env
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost
     depends_on:
       db:
         condition: service_healthy
+    # Override CMD with dev reload in development
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend:/app
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000
     ports:
-      - "80:5173"
+      - "5173:80"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
 
 volumes:
   pgdata:

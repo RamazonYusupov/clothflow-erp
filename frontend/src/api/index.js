@@ -1,5 +1,7 @@
 import axios from 'axios'
 
+// In production: VITE_API_URL is baked in at build time as "/api"
+// In development: falls back to direct backend URL
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
   timeout: 15000,
