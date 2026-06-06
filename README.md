@@ -1,6 +1,8 @@
 # Retail ERP-CRM
 
-Full-stack Retail ERP-CRM with RBAC — built with **FastAPI + Vue 3 + PostgreSQL**.
+Full-stack Retail ERP-CRM with RBAC — **FastAPI + Vue 3 + PostgreSQL + Nginx + HTTPS**
+
+Live at: **https://clothflow.systems**
 
 ---
 
@@ -12,36 +14,48 @@ docker-compose exec backend python seed.py
 ```
 
 - Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+- Backend API: http://localhost:8000/docs
 
 ### Login accounts
-| Role    | Email                    | Password     |
-|---------|--------------------------|--------------|
-| Admin   | ramzan06@gmail.com       | ramzan123    |
-| Manager | manager@example.com      | manager123   |
-| Kassir  | kassir@example.com       | kassir123    |
-| Ombochi | ombochi@example.com      | ombochi123   |
+| Role    | Email                 | Password   |
+|---------|-----------------------|------------|
+| Admin   | ramzan06@gmail.com    | ramzan123  |
+| Manager | manager@example.com   | manager123 |
+| Kassir  | kassir@example.com    | kassir123  |
+| Ombochi | ombochi@example.com   | ombochi123 |
 
 ---
 
-## DigitalOcean Deployment Guide
+## Production Deployment — DigitalOcean + clothflow.systems
 
 ### Step 1 — Create a Droplet
 
-1. Log in to [DigitalOcean](https://cloud.digitalocean.com)
-2. Click **Create → Droplets**
-3. Choose:
-   - **Image:** Ubuntu 22.04 LTS
-   - **Size:** Basic — $12/mo (2 GB RAM, 1 vCPU) minimum
-   - **Region:** Closest to your users
-   - **Authentication:** SSH Key (recommended) or Password
-4. Click **Create Droplet**
-5. Note the **Droplet IP address**
+1. Go to https://cloud.digitalocean.com → **Create → Droplets**
+2. Settings:
+   - **Image:** Ubuntu 22.04 LTS x64
+   - **Plan:** Basic Shared CPU — **$12/mo (2 GB RAM / 1 vCPU / 50 GB SSD)**
+   - **Region:** pick closest to your users
+   - **Authentication:** SSH Key (add your public key) or Password
+3. Click **Create Droplet** — note the **IP address** shown
 
 ---
 
-### Step 2 — Connect to the Droplet
+### Step 2 — Point clothflow.systems to the Droplet (Namecheap)
+
+1. Log in to **Namecheap → Domain List → clothflow.systems → Manage**
+2. Click the **Advanced DNS** tab
+3. Delete any existing A records, then add:
+
+   | Type | Host | Value               | TTL  |
+   |------|------|---------------------|------|
+   | A    | @    | YOUR_DROPLET_IP     | Auto |
+   | A    | www  | YOUR_DROPLET_IP     | Auto |
+
+4. Save. DNS propagates in 5–30 minutes (check with `ping clothflow.systems`)
+
+---
+
+### Step 3 — SSH into the Droplet
 
 ```bash
 ssh root@YOUR_DROPLET_IP
@@ -49,40 +63,19 @@ ssh root@YOUR_DROPLET_IP
 
 ---
 
-### Step 3 — Install Docker & Docker Compose
+### Step 4 — Install Docker
 
 ```bash
-# Update system
 apt update && apt upgrade -y
-
-# Install Docker
 curl -fsSL https://get.docker.com | sh
-
-# Install Docker Compose plugin
 apt install -y docker-compose-plugin
-
 # Verify
-docker --version
-docker compose version
+docker --version && docker compose version
 ```
 
 ---
 
-### Step 4 — Push your code to GitHub first
-
-On your local machine (if not done yet):
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/retail-erp-crm.git
-git push -u origin main
-```
-
----
-
-### Step 5 — Clone the repo on the Droplet
+### Step 5 — Clone your repo
 
 ```bash
 cd /opt
@@ -92,173 +85,87 @@ cd erp
 
 ---
 
-### Step 6 — Create the production environment file
+### Step 6 — Create production environment file
 
 ```bash
 cp .env.prod.example .env.prod
 nano .env.prod
 ```
 
-Fill in the values — replace everything that says `CHANGE_ME`:
+Fill in all values — example:
 
 ```env
 POSTGRES_DB=retail_erp
 POSTGRES_USER=erp_user
-POSTGRES_PASSWORD=MyStr0ngP@ssword123
+POSTGRES_PASSWORD=MyStr0ngP@ssword123!
 
-DATABASE_URL=postgresql://erp_user:MyStr0ngP@ssword123@db:5432/retail_erp
-SECRET_KEY=a8f3b2c1d9e4f7a6b5c8d2e1f0a9b3c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2
+DATABASE_URL=postgresql://erp_user:MyStr0ngP@ssword123!@db:5432/retail_erp
+SECRET_KEY=<output of: openssl rand -hex 32>
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
-ALLOWED_ORIGINS=http://YOUR_DROPLET_IP
+ALLOWED_ORIGINS=https://clothflow.systems,https://www.clothflow.systems
 ```
 
-> **Generate a strong SECRET_KEY:**
-> ```bash
-> openssl rand -hex 32
-> ```
+Generate a secure secret key:
+```bash
+openssl rand -hex 32
+```
 
-Save and exit: `Ctrl+O`, `Enter`, `Ctrl+X`
+Save: `Ctrl+O` → `Enter` → `Ctrl+X`
 
 ---
 
-### Step 7 — Deploy
+### Step 7 — Get SSL certificate (run ONCE)
+
+Make sure DNS has propagated first (`ping clothflow.systems` should return your IP).
 
 ```bash
-chmod +x deploy.sh
+chmod +x init-ssl.sh deploy.sh
+./init-ssl.sh
+```
+
+This installs certbot and gets a free Let's Encrypt certificate for both `clothflow.systems` and `www.clothflow.systems`.
+
+---
+
+### Step 8 — Deploy
+
+```bash
 ./deploy.sh
 ```
 
 This will:
-- Build all Docker images
-- Start PostgreSQL, Backend (Gunicorn), and Frontend (Nginx)
-- Run database migrations
-- Seed the database with demo data
+1. Build all Docker images
+2. Start PostgreSQL → FastAPI backend → Nginx frontend
+3. Run database migrations
+4. Seed demo data
+5. Start the certbot auto-renewal sidecar
 
 ---
 
-### Step 8 — Verify
+### Step 9 — Verify
 
 ```bash
-# Check all containers are running
-docker-compose -f docker-compose.prod.yml ps
+# All containers should show "Up"
+docker compose -f docker-compose.prod.yml ps
 
-# Check backend logs
-docker-compose -f docker-compose.prod.yml logs backend
-
-# Check frontend logs
-docker-compose -f docker-compose.prod.yml logs frontend
+# Test HTTPS
+curl -I https://clothflow.systems
+# Should return: HTTP/2 200
 ```
 
-Open your browser: `http://YOUR_DROPLET_IP`
+Open your browser: **https://clothflow.systems** ✅
 
 ---
 
-### Step 9 — Set up a domain + HTTPS (optional but recommended)
-
-#### Point your domain to the Droplet
-In your domain registrar DNS settings, add an **A record**:
-```
-Type: A
-Name: @  (or www)
-Value: YOUR_DROPLET_IP
-TTL: 3600
-```
-
-#### Install Certbot for free SSL
+## Re-deploying after code changes
 
 ```bash
-# Install Certbot
-apt install -y certbot
+# On your local machine
+git add .
+git commit -m "your changes"
+git push origin main
 
-# Stop frontend container temporarily (frees port 80)
-docker-compose -f docker-compose.prod.yml stop frontend
-
-# Get SSL certificate
-certbot certonly --standalone -d yourdomain.com -d www.yourdomain.com
-
-# Certificates are saved to:
-# /etc/letsencrypt/live/yourdomain.com/fullchain.pem
-# /etc/letsencrypt/live/yourdomain.com/privkey.pem
-```
-
-#### Update nginx.conf for HTTPS
-
-Edit `frontend/nginx.conf` and replace its contents with the HTTPS version:
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com www.yourdomain.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name yourdomain.com www.yourdomain.com;
-
-    ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-
-    root /usr/share/nginx/html;
-    index index.html;
-
-    gzip on;
-    gzip_types text/plain text/css application/json application/javascript;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass         http://backend:8000/;
-        proxy_http_version 1.1;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_read_timeout 120s;
-    }
-
-    location ~* \.(js|css|png|jpg|ico|svg|woff2?)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-Mount the certificates into the frontend container by adding this to `docker-compose.prod.yml` under the `frontend` service:
-
-```yaml
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-```
-
-Update `ALLOWED_ORIGINS` in `.env.prod`:
-```
-ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
-```
-
-Redeploy:
-```bash
-./deploy.sh
-```
-
-#### Auto-renew SSL
-```bash
-crontab -e
-# Add this line:
-0 3 * * * docker-compose -f /opt/erp/docker-compose.prod.yml stop frontend && certbot renew --quiet && docker-compose -f /opt/erp/docker-compose.prod.yml start frontend
-```
-
----
-
-### Re-deploying after code changes
-
-```bash
 # On the Droplet
 cd /opt/erp
 ./deploy.sh
@@ -266,26 +173,62 @@ cd /opt/erp
 
 ---
 
+## Useful server commands
+
+```bash
+# View live backend logs
+docker compose -f docker-compose.prod.yml logs -f backend
+
+# View nginx logs
+docker compose -f docker-compose.prod.yml logs -f frontend
+
+# Restart everything
+docker compose -f docker-compose.prod.yml restart
+
+# Open a shell inside the backend container
+docker compose -f docker-compose.prod.yml exec backend bash
+
+# Check SSL certificate expiry
+certbot certificates
+```
+
+---
+
 ## Architecture
 
 ```
-Internet
-    │
-    ▼
-[Nginx :80/:443]  ← serves Vue static files
-    │ /api/*
-    ▼
-[FastAPI/Gunicorn :8000]  ← REST API
-    │
-    ▼
-[PostgreSQL :5432]  ← data (internal Docker network only)
+Browser
+   │
+   │ HTTPS :443
+   ▼
+┌──────────────────────────────────┐
+│  Nginx (Docker)                  │
+│  - Serves Vue 3 static files     │
+│  - /api/* → proxy to backend     │
+│  - HTTP → HTTPS redirect         │
+│  - SSL: Let's Encrypt            │
+└──────────┬───────────────────────┘
+           │ http://backend:8000
+           ▼
+┌──────────────────────────────────┐
+│  FastAPI + Gunicorn (Docker)     │
+│  - REST API                      │
+│  - JWT auth + RBAC               │
+└──────────┬───────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────┐
+│  PostgreSQL 15 (Docker)          │
+│  - Internal network only         │
+│  - Persistent volume             │
+└──────────────────────────────────┘
 ```
 
-## Roles
+## RBAC Roles
 
-| Role    | Dashboard | Customers | Products | Orders | Reports | Users |
-|---------|-----------|-----------|----------|--------|---------|-------|
-| Admin   | ✅ Full   | ✅ Full   | ✅ Full  | ✅ Full| ✅      | ✅    |
-| Manager | ✅        | ✅ No del | 👁 View  | ✅     | ✅      | ❌    |
-| Kassir  | ✅        | 👁 View   | 👁 View  | Create | ❌      | ❌    |
-| Ombochi | ✅        | ❌        | ✅ No del| ❌     | ❌      | ❌    |
+| Role    | Dashboard | Customers   | Products    | Orders       | Reports | Users |
+|---------|-----------|-------------|-------------|--------------|---------|-------|
+| Admin   | ✅ Full   | ✅ Full     | ✅ Full     | ✅ Full      | ✅      | ✅    |
+| Manager | ✅        | ✅ No delete| 👁 View     | ✅ + Status  | ✅      | ❌    |
+| Kassir  | ✅        | 👁 View     | 👁 View     | Create only  | ❌      | ❌    |
+| Ombochi | ✅        | ❌          | ✅ No delete| ❌           | ❌      | ❌    |
