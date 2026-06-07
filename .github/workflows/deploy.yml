@@ -1,0 +1,45 @@
+# .github/workflows/deploy.yml
+name: CI/CD — Test, Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -r backend/requirements.txt
+      - run: pytest backend/tests/ -v
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: $ github.actor 
+          password: $ secrets.GITHUB_TOKEN 
+      - run: |
+          docker build -t ghcr.io/ramazonyusupov/clothflow-erp/backend:$ github.sha  ./backend
+          docker push ghcr.io/ramazonyusupov/clothflow-erp/backend:$ github.sha 
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Droplet via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: $ secrets.DROPLET_IP 
+          username: root
+          key: $ secrets.SSH_PRIVATE_KEY 
+          script: |
+            cd /opt/erp
+            git pull origin main
+            ./deploy.sh
