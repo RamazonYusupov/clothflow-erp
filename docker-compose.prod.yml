@@ -1,5 +1,3 @@
-version: '3.8'
-
 # ── Production compose ────────────────────────────────────────────────────────
 # First-time setup:  ./init-ssl.sh
 # Deploy / redeploy: ./deploy.sh
