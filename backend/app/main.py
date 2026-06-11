@@ -9,9 +9,9 @@ import app.models  # noqa: F401 — register all models with Base
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Retail ERP-CRM API",
+    title="Retail ERP API",
     version="2.0.0",
-    description="Full-stack Retail ERP-CRM with RBAC",
+    description="Full-stack Retail ERP with RBAC",
 )
 
 # CORS — reads from env so the same image works in dev and prod

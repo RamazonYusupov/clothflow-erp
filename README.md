@@ -1,6 +1,6 @@
-# Retail ERP-CRM
+# Retail ERP
 
-Full-stack Retail ERP-CRM with RBAC — **FastAPI + Vue 3 + PostgreSQL + Nginx + HTTPS**
+Full-stack Retail ERP with RBAC — **FastAPI + Vue 3 + PostgreSQL + Nginx + HTTPS**
 
 Live at: **https://clothflow.systems**
 
@@ -79,7 +79,7 @@ docker --version && docker compose version
 
 ```bash
 cd /opt
-git clone https://github.com/YOUR_USERNAME/retail-erp-crm.git erp
+git clone https://github.com/YOUR_USERNAME/retail-erp.git erp
 cd erp
 ```
 
