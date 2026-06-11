@@ -2,7 +2,7 @@
   <aside class="sidebar">
     <div class="sidebar-brand">
       <span class="brand-icon">🛍️</span>
-      <span class="brand-text">Retail-ERP</span>
+      <span class="brand-text">Retake-ERP</span>
     </div>
 
     <nav class="sidebar-nav">
